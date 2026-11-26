@@ -6,11 +6,12 @@ from app.core.permissions import require_roles
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.user import User
+from app.schemas.documentation import AuditEntryResponse
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
 
-@router.get("")
+@router.get("", response_model=list[AuditEntryResponse])
 def list_audit(db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "VALIDATOR"))):
     logs = db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(500))
     return [{

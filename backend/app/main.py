@@ -5,10 +5,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
+from app.api.documentation import API_DESCRIPTION, ERROR_RESPONSE, OPERATIONS, TAGS_METADATA
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
+from app.schemas.documentation import HealthResponse
 import app.models  # noqa: F401 - register SQLAlchemy models
 
 
@@ -50,14 +52,20 @@ async def lifespan(app: FastAPI):
 
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title=settings.app_name,
+    version="0.1.0",
+    description=API_DESCRIPTION,
+    openapi_tags=TAGS_METADATA,
+    lifespan=lifespan,
+)
 register_exception_handlers(app)
 from app.api.v1.router import router
 app.include_router(router)
 
 
 def custom_openapi() -> dict:
-    """Expose multipart uploads as file inputs in Swagger UI."""
+    """Expose French operation guides and accurate binary upload/download schemas."""
 
     if app.openapi_schema:
         return app.openapi_schema
@@ -67,15 +75,69 @@ def custom_openapi() -> dict:
         version=app.version,
         routes=app.routes,
     )
+    schema["tags"] = TAGS_METADATA
     operation = schema["paths"]["/api/batches/{batch_id}/documents"]["post"]
     request_schema = operation["requestBody"]["content"]["multipart/form-data"]["schema"]
     body_schema = schema["components"]["schemas"][request_schema["$ref"].rsplit("/", 1)[-1]]
     body_schema["properties"]["files"]["items"]["format"] = "binary"
-    operation["summary"] = "Upload documents"
-    operation["description"] = (
-        "Upload one or more PDF/image files. In Swagger UI, use the file picker "
-        "to select one or several files. Upload does not start LLM extraction."
+    schema["info"]["description"] = API_DESCRIPTION
+
+    parameter_descriptions = {
+        "batch_id": "UUID public du lot, renvoyé lors de sa création.",
+        "document_id": "UUID public du document, renvoyé lors de son import.",
+        "anomaly_id": "UUID public de l'anomalie, renvoyé dans la liste des anomalies.",
+        "client_id": "UUID public du client.",
+        "product_id": "UUID public du produit.",
+        "invoice_id": "UUID public de la facture ou du brouillon.",
+        "user_id": "UUID public de l'utilisateur.",
+        "retry_failed": "Inclure les documents en échec lors de la mise en traitement.",
+    }
+    error_descriptions = {
+        401: "Authentification absente, invalide ou expirée.",
+        403: "Le rôle de l'utilisateur ne permet pas cette opération.",
+        404: "La ressource demandée n'existe pas.",
+        409: "L'opération est incompatible avec l'état ou les règles métier.",
+        413: "Le fichier dépasse la taille maximale configurée.",
+        415: "Le format du fichier n'est pas pris en charge.",
+        422: "Le corps, les paramètres ou le fichier ne respectent pas le contrat attendu.",
+        503: "Un service ou stockage nécessaire est temporairement indisponible.",
+    }
+    for path, path_item in schema["paths"].items():
+        for method, operation in path_item.items():
+            if method not in {"get", "post", "put", "patch", "delete"}:
+                continue
+            documentation = OPERATIONS.get((method, path))
+            if documentation is None:
+                raise RuntimeError(f"OpenAPI documentation is missing for {method.upper()} {path}")
+            summary, description, error_codes = documentation
+            operation["summary"] = summary
+            operation["description"] = description
+            for parameter in operation.get("parameters", []):
+                if parameter["name"] in parameter_descriptions:
+                    parameter["description"] = parameter_descriptions[parameter["name"]]
+            for code in error_codes:
+                operation.setdefault("responses", {}).setdefault(
+                    str(code),
+                    {
+                        **ERROR_RESPONSE,
+                        "description": error_descriptions[code],
+                    },
+                )
+
+    preview = schema["paths"]["/api/documents/{document_id}/preview"]["get"]
+    preview["responses"]["200"]["description"] = (
+        "Contenu binaire du fichier original; le Content-Type correspond au document."
     )
+    preview["responses"]["200"]["content"] = {
+        "application/pdf": {"schema": {"type": "string", "format": "binary"}},
+        "image/*": {"schema": {"type": "string", "format": "binary"}},
+    }
+
+    pdf = schema["paths"]["/api/invoices/{invoice_id}/pdf"]["get"]
+    pdf["responses"]["200"]["description"] = "Fichier PDF de la facture."
+    pdf["responses"]["200"]["content"] = {
+        "application/pdf": {"schema": {"type": "string", "format": "binary"}}
+    }
     app.openapi_schema = schema
     return app.openapi_schema
 
@@ -83,7 +145,7 @@ def custom_openapi() -> dict:
 app.openapi = custom_openapi
 
 
-@app.get("/api/health", tags=["health"])
+@app.get("/api/health", tags=["health"], response_model=HealthResponse)
 def health() -> dict[str, str]:
     """Return a lightweight health status for monitoring."""
 

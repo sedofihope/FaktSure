@@ -2,6 +2,8 @@
 
 L'API est préfixée par `/api`. La spécification OpenAPI générée par FastAPI est disponible à `/docs` (et le schéma JSON à `/openapi.json`) lorsque le serveur est démarré.
 
+La documentation Swagger est rédigée en français pour l'intégration frontend : chaque opération décrit son rôle, ses paramètres, les règles métier, les effets de bord, les erreurs possibles et le parcours recommandé. Les schémas de requête et de réponse documentent les champs; les fichiers uploadés et téléchargés sont exposés comme binaires.
+
 ## Identifiants publics
 
 Les ressources exposées par l'API sont identifiées par leur `public_id`, un UUID au format canonique, par exemple `8c4a4b9e-4e51-46c1-8c4a-9b9f1d45a4c2`. Utilisez cet UUID dans les chemins et les références entre ressources. Les clés numériques restent internes à la base et ne doivent pas être utilisées par les clients API.

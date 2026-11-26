@@ -2,12 +2,23 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class FieldCorrection(BaseModel):
-    field_name: str = Field(min_length=1, max_length=100)
-    corrected_value: str = Field(min_length=1, max_length=10000)
+    field_name: str = Field(
+        min_length=1,
+        max_length=100,
+        description="Nom exact du champ retourné par GET /documents/{id}/fields.",
+    )
+    corrected_value: str = Field(
+        min_length=1,
+        max_length=10000,
+        description="Valeur corrigée à retenir pour les contrôles et la facture.",
+    )
 
 
 class CorrectFieldsRequest(BaseModel):
-    corrections: list[FieldCorrection] = Field(min_length=1)
+    corrections: list[FieldCorrection] = Field(
+        min_length=1,
+        description="Corrections ciblées; les champs omis restent inchangés.",
+    )
 
 
 class DocumentReviewRequest(BaseModel):

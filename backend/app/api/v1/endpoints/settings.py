@@ -10,23 +10,44 @@ from app.core.runtime_settings import get_runtime_settings, update_settings_over
 from app.db.session import get_db
 from app.models.app_setting import AppSetting
 from app.models.user import User
+from app.schemas.documentation import SettingsResponse, SettingsUpdateResponse
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 class ProcessingSettingsUpdate(BaseModel):
-    document_batch_size: int = Field(ge=1, le=100)
-    max_document_concurrency: int = Field(ge=1, le=32)
-    max_upload_size_mb: int = Field(ge=1, le=500)
+    document_batch_size: int = Field(
+        ge=1,
+        le=100,
+        description="Nombre de documents regroupés dans un lot interne (1 à 100).",
+    )
+    max_document_concurrency: int = Field(
+        ge=1,
+        le=32,
+        description="Nombre maximal de documents traités simultanément (1 à 32).",
+    )
+    max_upload_size_mb: int = Field(
+        ge=1,
+        le=500,
+        description="Taille maximale acceptée par fichier, en Mo (1 à 500).",
+    )
 
 
 class AISettingsUpdate(BaseModel):
-    provider: Literal["gemini", "groq", "cloudflare"]
-    model: str = Field(min_length=1, max_length=200)
+    provider: Literal["gemini", "groq", "cloudflare"] = Field(
+        description="Fournisseur dont les identifiants sont déjà définis dans l'environnement.",
+    )
+    model: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Identifiant du modèle à utiliser auprès du fournisseur.",
+    )
 
 
 class StorageSettingsUpdate(BaseModel):
-    backend: Literal["local", "r2"]
+    backend: Literal["local", "r2"] = Field(
+        description="Backend de stockage des fichiers : local ou R2.",
+    )
 
 
 def _persist(db: Session, values: dict[str, object]) -> None:
@@ -41,7 +62,7 @@ def _persist(db: Session, values: dict[str, object]) -> None:
     update_settings_overrides(values)
 
 
-@router.get("")
+@router.get("", response_model=SettingsResponse)
 def read_settings(
     _user: User = Depends(require_roles("ADMIN")),
 ):
@@ -89,7 +110,7 @@ def read_settings(
     }
 
 
-@router.put("/processing")
+@router.put("/processing", response_model=SettingsUpdateResponse)
 def update_processing_settings(
     payload: ProcessingSettingsUpdate,
     db: Session = Depends(get_db),
@@ -100,7 +121,7 @@ def update_processing_settings(
     return {"status": "updated", "processing": values}
 
 
-@router.put("/ai")
+@router.put("/ai", response_model=SettingsUpdateResponse)
 def update_ai_settings(
     payload: AISettingsUpdate,
     db: Session = Depends(get_db),
@@ -122,7 +143,7 @@ def update_ai_settings(
     return {"status": "updated", "provider": payload.provider, "model": payload.model}
 
 
-@router.put("/storage")
+@router.put("/storage", response_model=SettingsUpdateResponse)
 def update_storage_settings(
     payload: StorageSettingsUpdate,
     db: Session = Depends(get_db),

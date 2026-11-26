@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, File, Query
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -11,13 +11,20 @@ from app.db.session import get_db
 from app.models.document_batch import DocumentBatch
 from app.models.user import User
 from app.schemas.batch import BatchCreate, BatchResponse
+from app.schemas.documentation import BatchProcessResponse, BatchUploadResponse
 
 router = APIRouter(tags=["batches"])
 logger = logging.getLogger(__name__)
 
 
-@router.post("/batches/{batch_id}/documents")
-async def upload_documents(batch_id: UUID, files: list[UploadFile] = File(...), db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT"))):
+@router.post(
+    "/batches/{batch_id}/documents",
+    response_model=BatchUploadResponse,
+)
+async def upload_documents(batch_id: UUID, files: list[UploadFile] = File(
+    ...,
+    description="Un ou plusieurs fichiers PDF ou images (PNG, JPEG, TIFF, WebP).",
+), db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT"))):
     """Import files individually, preserving originals and reporting each result."""
 
     batch = db.scalar(select(DocumentBatch).where(DocumentBatch.public_id == batch_id))
@@ -98,11 +105,18 @@ def _detect_mime_type(content: bytes) -> str | None:
     return None
 
 
-@router.post("/batches/{batch_id}/process", status_code=202)
+@router.post(
+    "/batches/{batch_id}/process",
+    status_code=202,
+    response_model=BatchProcessResponse,
+)
 def process_batch(
     batch_id: UUID,
     background_tasks: BackgroundTasks,
-    retry_failed: bool = False,
+    retry_failed: bool = Query(
+        default=False,
+        description="Inclure également les documents en échec pour une nouvelle tentative.",
+    ),
     db: Session = Depends(get_db),
     _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT")),
 ):

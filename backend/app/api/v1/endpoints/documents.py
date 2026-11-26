@@ -19,13 +19,22 @@ from app.schemas.anomaly import (
     DocumentReviewRequest,
     ResolveAnomalyRequest,
 )
+from app.schemas.documentation import (
+    AnomalyResponse,
+    CorrectFieldsResponse,
+    DocumentRejectResponse,
+    DocumentReviewResponse,
+    ExtractedFieldResponse,
+    ResolveAnomalyResponse,
+)
+from app.schemas.extraction import ExtractionResponse
 from app.services.extraction_service import ExtractionService
 from app.storage.manager import StorageManager
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
-@router.get("/{document_id}/fields")
+@router.get("/{document_id}/fields", response_model=list[ExtractedFieldResponse])
 def list_fields(document_id: UUID, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT", "VALIDATOR"))):
     from app.models.extracted_field import ExtractedField
     document = db.scalar(select(Document).where(Document.public_id == document_id))
@@ -35,7 +44,7 @@ def list_fields(document_id: UUID, db: Session = Depends(get_db), _user: User = 
     return [{"public_id": f.public_id, "field_name": f.field_name, "value": f.value, "corrected_value": f.corrected_value, "confidence": f.confidence, "status": f.status, "source_page": f.source_page, "source_text": f.source_text, "source_bbox": f.source_bbox} for f in fields]
 
 
-@router.put("/{document_id}/fields")
+@router.put("/{document_id}/fields", response_model=CorrectFieldsResponse)
 def correct_fields(document_id: UUID, payload: CorrectFieldsRequest, db: Session = Depends(get_db), user: User = Depends(require_roles("ADMIN", "ACCOUNTANT"))):
     from datetime import datetime, UTC
     from app.models.audit_log import AuditLog
@@ -89,7 +98,7 @@ def correct_fields(document_id: UUID, payload: CorrectFieldsRequest, db: Session
     return {"status": "corrected", "count": len(corrections)}
 
 
-@router.get("/{document_id}/anomalies")
+@router.get("/{document_id}/anomalies", response_model=list[AnomalyResponse])
 def get_anomalies(document_id: UUID, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT", "VALIDATOR"))):
     from app.models.anomaly import Anomaly
     document = db.scalar(select(Document).where(Document.public_id == document_id))
@@ -99,7 +108,10 @@ def get_anomalies(document_id: UUID, db: Session = Depends(get_db), _user: User 
     return [{"public_id": anomaly.public_id, "field_name": anomaly.field_name, "anomaly_type": anomaly.anomaly_type, "severity": anomaly.severity, "description": anomaly.description, "expected_value": anomaly.expected_value, "actual_value": anomaly.actual_value, "status": anomaly.status} for anomaly in anomalies]
 
 
-@router.post("/{document_id}/anomalies/{anomaly_id}/resolve")
+@router.post(
+    "/{document_id}/anomalies/{anomaly_id}/resolve",
+    response_model=ResolveAnomalyResponse,
+)
 def resolve_blocker(
     document_id: UUID,
     anomaly_id: UUID,
@@ -157,7 +169,7 @@ def resolve_blocker(
     return {"status": "resolved", "anomaly_id": str(anomaly.public_id)}
 
 
-@router.post("/{document_id}/review")
+@router.post("/{document_id}/review", response_model=DocumentReviewResponse)
 def review_document(document_id: UUID, payload: DocumentReviewRequest, db: Session = Depends(get_db), user: User = Depends(require_roles("ADMIN", "ACCOUNTANT", "VALIDATOR"))):
     from datetime import UTC, datetime
 
@@ -204,7 +216,7 @@ def review_document(document_id: UUID, payload: DocumentReviewRequest, db: Sessi
     return {"status": "READY", "reviewed_by": user.id}
 
 
-@router.post("/{document_id}/reject")
+@router.post("/{document_id}/reject", response_model=DocumentRejectResponse)
 def reject_document(document_id: UUID, payload: DocumentRejectRequest, db: Session = Depends(get_db), user: User = Depends(require_roles("ADMIN", "ACCOUNTANT", "VALIDATOR"))):
     from app.models.audit_log import AuditLog
 
@@ -248,7 +260,7 @@ def preview_document(document_id: UUID, db: Session = Depends(get_db), _user: Us
     )
 
 
-@router.post("/{document_id}/extract")
+@router.post("/{document_id}/extract", response_model=ExtractionResponse)
 def extract_document(document_id: UUID, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT"))):
     document = db.scalar(select(Document).where(Document.public_id == document_id))
     if document is None:

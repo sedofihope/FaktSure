@@ -20,6 +20,7 @@ from app.schemas.reference import (
     ProductPriceCreate, ProductPriceResponse,
     TaxRuleCreate, TaxRuleResponse,
 )
+from app.schemas.documentation import ReferenceImportResponse
 
 router = APIRouter(tags=["references"])
 
@@ -54,7 +55,7 @@ def create_price(product_id: UUID, payload: ProductPriceCreate, db: Session = De
     return price
 
 
-@router.post("/references/import")
+@router.post("/references/import", response_model=ReferenceImportResponse)
 async def import_references(file: UploadFile, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT"))):
     """Import reference rows from a CSV or XLSX file with line-level errors."""
 
