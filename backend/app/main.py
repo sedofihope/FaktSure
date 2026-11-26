@@ -23,7 +23,8 @@ def configure_cors(app: FastAPI, settings: Settings) -> None:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.parsed_cors_origins,
+        # allow_origins=settings.parsed_cors_origins,
+        allow_origins=["*"],
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
