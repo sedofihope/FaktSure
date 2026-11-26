@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <style>{{ css | safe }}</style>
+</head>
+<body class="{% if is_issued %}issued{% else %}draft{% endif %}">
+  {% if not is_issued %}
+  <div class="watermark" aria-hidden="true">BROUILLON — NON ÉMISE</div>
+  {% endif %}
+
+  <main class="invoice">
+    <header class="top">
+      <div class="brand">
+        <div class="brand-lockup">
+          <svg class="logo-symbol" viewBox="0 0 64 64" role="img" aria-label="Symbole FaktSure">
+            <path d="M18 10h20l10 10v28a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V14a4 4 0 0 1 4-4z" fill="#FFFFFF"/>
+            <path d="M38 10v10h10z" fill="#BFCBD5"/>
+            <rect x="20" y="26" width="16" height="3" rx="1.5" fill="#9FB0BE"/>
+            <rect x="20" y="33" width="10" height="3" rx="1.5" fill="#9FB0BE"/>
+            <circle cx="46" cy="46" r="13" fill="#067A4B" stroke="#0E2A47" stroke-width="3"/>
+            <path d="m40 46.5 4.5 4.5L53 41.5" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div class="wordmark"><span>Fakt</span><span>Sure</span></div>
+        </div>
+        <p>De la source au brouillon, vérifié avant d’être émis.</p>
+      </div>
+      <div class="invoice-heading">
+        <span class="tag">{{ "FACTURE" if is_issued else "BROUILLON" }}</span>
+        {% if is_issued %}
+          <h1>{{ invoice_number }}</h1>
+        {% else %}
+          <h1>Facture en préparation</h1>
+          <p class="draft-ref">Référence provisoire · {{ invoice_number }}</p>
+        {% endif %}
+        <p>Émise le {{ issue_date }}</p>
+        {% if due_date %}<p>Échéance · {{ due_date }}</p>{% endif %}
+      </div>
+    </header>
+
+    <section class="addresses">
+      <div class="block">
+        <p class="label">ÉMETTEUR</p>
+        {% if issuer.name %}<h2>{{ issuer.name }}</h2>{% endif %}
+        {% if issuer.address %}<p class="preserve-lines">{{ issuer.address }}</p>{% endif %}
+        {% if issuer.tax_identifier or issuer.rccm %}
+        <p>
+          {% if issuer.tax_identifier %}IFU · {{ issuer.tax_identifier }}{% endif %}
+          {% if issuer.tax_identifier and issuer.rccm %}<br>{% endif %}
+          {% if issuer.rccm %}RCCM · {{ issuer.rccm }}{% endif %}
+        </p>
+        {% endif %}
+        {% if issuer.email or issuer.phone %}
+        <p>
+          {% if issuer.email %}{{ issuer.email }}{% endif %}
+          {% if issuer.email and issuer.phone %}<br>{% endif %}
+          {% if issuer.phone %}{{ issuer.phone }}{% endif %}
+        </p>
+        {% endif %}
+      </div>
+      <div class="block recipient">
+        <p class="label">FACTURÉ À</p>
+        {% if client.name %}<h2>{{ client.name }}</h2>{% endif %}
+        {% if client.address %}<p class="preserve-lines">{{ client.address }}</p>{% endif %}
+        {% if client.tax_identifier or client.rccm %}
+        <p>
+          {% if client.tax_identifier %}IFU · {{ client.tax_identifier }}{% endif %}
+          {% if client.tax_identifier and client.rccm %}<br>{% endif %}
+          {% if client.rccm %}RCCM · {{ client.rccm }}{% endif %}
+        </p>
+        {% endif %}
+        {% if client.email or client.phone %}
+        <p>
+          {% if client.email %}{{ client.email }}{% endif %}
+          {% if client.email and client.phone %}<br>{% endif %}
+          {% if client.phone %}{{ client.phone }}{% endif %}
+        </p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="meta">
+      {% if source_reference %}
+      <div><span>Document source</span><strong>{{ source_reference }}</strong></div>
+      {% endif %}
+      <div><span>Devise</span><strong>{{ currency }}</strong></div>
+      {% if payment_terms %}<div><span>Conditions de paiement</span><strong>{{ payment_terms }}</strong></div>{% endif %}
+    </section>
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th>DÉSIGNATION</th>
+          <th class="numeric-heading">QTÉ</th>
+          <th class="numeric-heading">PRIX UNIT. HT</th>
+          <th class="numeric-heading">REMISE</th>
+          <th class="numeric-heading">MONTANT HT</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td><strong>{{ item.description }}</strong></td>
+          <td>{{ item.quantity }}{% if item.unit %}<small>{{ item.unit }}</small>{% endif %}</td>
+          <td class="numeric">{{ item.unit_price }}</td>
+          <td class="numeric">{% if item.discount %}{{ item.discount }}{% if item.discount_rate %}<small>({{ item.discount_rate }} %)</small>{% endif %}{% else %}—{% endif %}</td>
+          <td class="numeric">{{ item.line_total }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <section class="totals-area">
+      <div class="note">
+        {% if payment_terms %}
+        <h3>Notes & conditions</h3>
+        <p class="preserve-lines">{{ payment_terms }}</p>
+        {% endif %}
+        <p class="thanks">Merci pour votre confiance.</p>
+      </div>
+      <div class="totals">
+        <div><span>Total HT</span><strong>{{ subtotal }} {{ currency }}</strong></div>
+        {% if discount_total %}<div><span>Remises</span><strong>− {{ discount_total }} {{ currency }}</strong></div>{% endif %}
+        {% if tax_total %}<div class="net-after-discount"><span>Total net après remises</span><strong>{{ taxable_base_total }} {{ currency }}</strong></div>{% endif %}
+        {% for tax in taxes %}
+        {% if tax.base %}
+        <div class="tax-base"><span>Base soumise à {{ tax.name }} ({{ tax.rate }} %)</span><strong>{{ tax.base }} {{ currency }}</strong></div>
+        {% endif %}
+        <div class="tax-line"><span>{{ tax.name }}{% if tax.rate_label %} ({{ tax.rate_label }}){% endif %}</span><strong>{{ tax.amount }} {{ currency }}</strong></div>
+        {% endfor %}
+        {% if not taxes and tax_total %}<div class="tax-line"><span>Taxes</span><strong>{{ tax_total }} {{ currency }}</strong></div>{% endif %}
+        <div class="grand"><span>Total TTC</span><strong>{{ grand_total }} {{ currency }}</strong></div>
+        <div class="amount-due"><span>Montant dû</span><strong>{{ grand_total }} {{ currency }}</strong></div>
+      </div>
+    </section>
+
+    <footer>
+      <div><strong>FaktSure</strong><p>Votre gestion, en toute clarté.</p></div>
+      <div class="footer-right">Document généré avec FaktSure</div>
+    </footer>
+  </main>
+</body>
+</html>

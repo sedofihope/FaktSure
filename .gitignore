@@ -62,3 +62,6 @@ frontend/.vite/
 *.key
 credentials.json
 service-account.json
+
+# Private files
+private/
