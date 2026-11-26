@@ -7,12 +7,7 @@
 
 - Le dépôt contient le **backend** (API REST, extraction IA, contrôles métier, facturation, PDF, audit) et sa suite de tests automatisés, et le **frontend** (React + Vite).
 - Périmètre d'extraction : **PDF natifs qui contiennent du texte**. Les PDF scannés, PDF mixtes et images sont identifiés à l'import et conservés, mais leur extraction (OCR/vision) n'est pas implémentée.
-- Avant de figer le dossier de remise, consigner l'empreinte exacte du dépôt :
-
-```bash
-git rev-parse HEAD
-git status --short
-```
+- Empreinte de commit : `2e8d481a0cf2efea21037ba66421f863fba0706e`
 
 ## 2. Prérequis
 
