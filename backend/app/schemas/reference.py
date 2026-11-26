@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class TaxRuleCreate(BaseModel):
-    name: str = Field(description="Libellé de la règle, par exemple TVA.")
-    rate: Decimal = Field(ge=0, le=100, description="Taux en pourcentage, entre 0 et 100.")
+    name: str = Field(description="Libellé de la règle de TVA, par exemple « TVA normale » ou « TVA exonérée ».")
+    rate: Decimal = Field(ge=0, le=100, description="Taux de TVA en pourcentage, entre 0 et 100.")
     calculation_type: str = Field(default="PERCENTAGE", description="Type de calcul actuellement pris en charge : PERCENTAGE.")
     valid_from: date = Field(description="Premier jour d'application inclus, format YYYY-MM-DD.")
     valid_until: date | None = Field(default=None, description="Dernier jour d'application inclus; null signifie sans date de fin.")

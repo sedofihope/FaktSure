@@ -12,7 +12,7 @@ router = APIRouter(prefix="/audit", tags=["audit"])
 
 
 @router.get("", response_model=list[AuditEntryResponse])
-def list_audit(db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "VALIDATOR"))):
+def list_audit(db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN"))):
     logs = db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(500))
     return [{
         "public_id": log.public_id,

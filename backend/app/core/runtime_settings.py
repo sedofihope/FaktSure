@@ -22,6 +22,16 @@ def load_settings_overrides(db: Session) -> None:
             parsed[row.key] = row.value == "true"
         elif row.key in {"llm_provider", "gemini_model", "groq_model", "cloudflare_model"}:
             parsed[row.key] = row.value
+        elif row.key in {
+            "issuer_name",
+            "issuer_address",
+            "issuer_tax_identifier",
+            "issuer_rccm",
+            "issuer_phone",
+            "issuer_email",
+            "issuer_payment_terms",
+        }:
+            parsed[row.key] = row.value
     with _lock:
         _overrides.clear()
         _overrides.update(parsed)

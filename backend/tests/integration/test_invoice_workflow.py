@@ -316,7 +316,7 @@ def test_document_to_validated_invoice_workflow(monkeypatch):
                 from app.models import Invoice
 
                 persisted_invoice = db.query(Invoice).one()
-                assert persisted_invoice.pdf_format_version == 7
+                assert persisted_invoice.pdf_format_version == 8
                 persisted_invoice.pdf_format_version = None
 
             persisted_response = client.get(
@@ -357,7 +357,7 @@ def test_document_to_validated_invoice_workflow(monkeypatch):
 
                 persisted_invoice = db.query(Invoice).one()
                 assert persisted_invoice.pdf_storage_backend == "r2"
-                assert persisted_invoice.pdf_format_version == 7
+                assert persisted_invoice.pdf_format_version == 8
                 assert persisted_invoice.pdf_storage_key == (
                     f"invoices/{invoice_id}/invoice.pdf"
                 )

@@ -31,7 +31,7 @@ def list_tax_rules(db: Session = Depends(get_db), _user: User = Depends(require_
 
 
 @router.post("/tax-rules", response_model=TaxRuleResponse, status_code=201)
-def create_tax_rule(payload: TaxRuleCreate, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT"))):
+def create_tax_rule(payload: TaxRuleCreate, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN"))):
     rule = TaxRule(**payload.model_dump())
     db.add(rule); db.commit(); db.refresh(rule)
     return rule
@@ -46,7 +46,7 @@ def list_prices(product_id: UUID, db: Session = Depends(get_db), _user: User = D
 
 
 @router.post("/products/{product_id}/prices", response_model=ProductPriceResponse, status_code=201)
-def create_price(product_id: UUID, payload: ProductPriceCreate, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT"))):
+def create_price(product_id: UUID, payload: ProductPriceCreate, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN"))):
     product = db.scalar(select(Product).where(Product.public_id == product_id))
     if product is None:
         raise NotFoundError("Product not found")
@@ -56,7 +56,7 @@ def create_price(product_id: UUID, payload: ProductPriceCreate, db: Session = De
 
 
 @router.post("/references/import", response_model=ReferenceImportResponse)
-async def import_references(file: UploadFile, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT"))):
+async def import_references(file: UploadFile, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN"))):
     """Import reference rows from a CSV or XLSX file with line-level errors."""
 
     import csv

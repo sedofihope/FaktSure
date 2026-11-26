@@ -8,7 +8,7 @@ La documentation Swagger est rédigée en français pour l'intégration frontend
 
 Les ressources exposées par l'API sont identifiées par leur `public_id`, un UUID au format canonique, par exemple `8c4a4b9e-4e51-46c1-8c4a-9b9f1d45a4c2`. Utilisez cet UUID dans les chemins et les références entre ressources. Les clés numériques restent internes à la base et ne doivent pas être utilisées par les clients API.
 
-Les réponses d'authentification, utilisateurs, clients, produits, règles de taxe, tarifs, lots, documents, champs extraits, anomalies et factures fournissent un `public_id`. Les références telles que `document_id`, `batch_id`, `client_id`, `product_id`, `tax_rule_id` et `anomaly_id` sont également des UUID lorsqu'elles sont acceptées ou renvoyées par l'API. Les clients acceptent et retournent notamment `tax_identifier` et `rccm`; le RCCM est facultatif.
+Les réponses d'authentification, utilisateurs, clients, produits, règles de TVA, tarifs, lots, documents, champs extraits, anomalies et factures fournissent un `public_id`. Les références telles que `document_id`, `batch_id`, `client_id`, `product_id`, `tax_rule_id` et `anomaly_id` sont également des UUID lorsqu'elles sont acceptées ou renvoyées par l'API. Les clients acceptent et retournent notamment `tax_identifier` et `rccm`; le RCCM est facultatif. Seul `ADMIN` peut créer ou modifier les référentiels (clients, produits, tarifs, règles de TVA et imports); les autres rôles disposent d'un accès en lecture.
 
 ## Authentification et rôles
 
@@ -71,7 +71,7 @@ Content-Type: application/json
 
 Les lignes et la devise extraites sont utilisées par défaut. Si un client ne peut pas être associé sans ambiguïté par son RCCM/IFU (ou par son nom exact lorsqu'aucun identifiant n'est extrait), ajoute `client_id` avec l'UUID d'un client actif déjà créé. Tu peux fournir `issue_date` et `due_date`; sinon la date de facture prend la date du jour et l'échéance reste vide. Tu peux aussi remplacer la devise extraite avec `currency`.
 
-N'envoie `items` que pour remplacer manuellement les lignes extraites. Dans ce cas, chaque ligne contient `description`, `quantity`, `unit`, `unit_price`, et éventuellement `discount`, `product_id` et `tax_rule_id`. La remise globale extraite est répartie proportionnellement entre les lignes ; la taxe et les totaux extraits sont conservés et vérifiés. Les montants doivent se réconcilier selon `subtotal - discount_total + tax_total = grand_total`. Le backend recalcule les totaux du brouillon et refuse les données extraites incomplètes ou incohérentes plutôt que de les deviner.
+N'envoie `items` que pour remplacer manuellement les lignes extraites. Dans ce cas, chaque ligne contient `description`, `quantity`, `unit`, `unit_price`, et éventuellement `discount`, `product_id` et `tax_rule_id`. Pour une TVA par ligne (taux différents possibles), renseigne `tax_rule_id` sur les lignes concernées. Pour appliquer un taux unique sur toute la facture, renseigne plutôt `tax_rule_id` à la racine du corps JSON; la TVA est alors calculée sur `subtotal - discount_total`. Les deux niveaux ne peuvent pas être utilisés ensemble. La remise globale extraite est répartie proportionnellement entre les lignes ; la taxe et les totaux extraits sont conservés et vérifiés. Les montants doivent se réconcilier selon `subtotal - discount_total + tax_total = grand_total`. Le backend recalcule les totaux du brouillon et refuse les données extraites incomplètes ou incohérentes plutôt que de les deviner.
 
 Pour la validation de cohérence des montants extraits, le total attendu est `subtotal - discount_total + tax_total`; la remise est retranchée du sous-total avant d'ajouter la taxe calculée sur la base taxable remisée.
 
@@ -83,7 +83,7 @@ Pour la validation de cohérence des montants extraits, le total attendu est `su
 | Lots et documents | `GET/POST /api/batches`, `GET /api/batches/{batch_id}`, `POST /api/batches/{batch_id}/documents`, `POST /api/batches/{batch_id}/process` |
 | Documents | `GET /api/documents/{document_id}`, `GET /api/documents/{document_id}/preview`, `POST /api/documents/{document_id}/extract`, routes `/fields`, `/anomalies`, `/review` et `/reject` sous le document |
 | Clients et produits | CRUD sous `/api/clients` et `/api/products` |
-| Référentiels | `/api/tax-rules`, `/api/products/{product_id}/prices`, `POST /api/references/import` (CSV/XLSX, clients avec colonne facultative `rccm`) |
+| Référentiels (écriture ADMIN seulement) | `/api/tax-rules` (règles de TVA appliquées par ligne), `/api/products/{product_id}/prices`, `POST /api/references/import` (CSV/XLSX, clients avec colonne facultative `rccm`) |
 | Factures | `GET/POST /api/invoices`, `GET/PUT /api/invoices/{invoice_id}`, `POST /api/invoices/{invoice_id}/validate`, `GET /api/invoices/{invoice_id}/pdf` |
 | Administration et audit | `/api/users`, `GET /api/audit` |
 

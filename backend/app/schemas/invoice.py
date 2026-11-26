@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from app.utils.number_formatting import format_decimal
 
@@ -14,7 +14,7 @@ class InvoiceItemCreate(BaseModel):
     unit: str = Field(default="unit", description="Unité affichée.")
     unit_price: Decimal = Field(ge=0, description="Prix unitaire avant remise.")
     discount: Decimal = Field(default=Decimal("0"), ge=0, description="Remise monétaire de la ligne.")
-    tax_rule_id: UUID | None = Field(default=None, description="UUID public de la règle fiscale applicable.")
+    tax_rule_id: UUID | None = Field(default=None, description="UUID public de la règle de TVA applicable à cette ligne.")
 
 
 class InvoiceCreate(BaseModel):
@@ -48,11 +48,26 @@ class InvoiceCreate(BaseModel):
         max_length=10,
         description="Code devise de remplacement; par défaut la devise extraite, convertie si nécessaire en code ISO.",
     )
+    tax_rule_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Règle de TVA appliquée au total net de la facture après remises. "
+            "À utiliser à la place des tax_rule_id portés par les lignes."
+        ),
+    )
     items: list[InvoiceItemCreate] | None = Field(
         default=None,
         min_length=1,
         description="Omettre pour utiliser les lignes extraites; fournir une liste pour remplacer intégralement ces lignes.",
     )
+
+    @model_validator(mode="after")
+    def prevent_mixed_tax_scopes(self):
+        if self.tax_rule_id and self.items and any(item.tax_rule_id for item in self.items):
+            raise ValueError(
+                "Choose either one invoice-level tax_rule_id or line-level tax_rule_id values, not both"
+            )
+        return self
 
 
 class InvoiceUpdate(BaseModel):
@@ -67,6 +82,10 @@ class InvoiceResponse(BaseModel):
     issue_date: date = Field(description="Date d'émission.")
     due_date: date | None = Field(description="Échéance éventuelle.")
     payment_terms: str | None = Field(description="Modalités de paiement.")
+    tax_rule_id: UUID | None = Field(
+        validation_alias="tax_rule_public_id",
+        description="Règle de TVA globale appliquée au net après remises; null si la TVA est définie par ligne.",
+    )
     currency: str = Field(description="Code devise ISO 4217.")
     subtotal: Decimal = Field(description="Sous-total brut avant remises.")
     discount_total: Decimal = Field(description="Montant total des remises.")

@@ -1,7 +1,11 @@
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
+from types import SimpleNamespace
+from urllib.parse import unquote, urlparse
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -134,6 +138,91 @@ def test_invoice_uses_default_issue_date_for_tax_rule_validation(invoice_db):
     assert invoice.issue_date == date.today()
     assert invoice.tax_total == Decimal("3.47")
     assert invoice.grand_total == Decimal("22.72")
+
+
+def test_invoice_level_vat_applies_to_net_total_after_discounts(invoice_db):
+    db, _validator_id, document_info = invoice_db
+    rule = db.query(TaxRule).one()
+    payload = InvoiceCreate(
+        document_id=document_info[0][0],
+        client_id=document_info[0][1],
+        issue_date=date(2026, 11, 25),
+        currency="XOF",
+        tax_rule_id=rule.public_id,
+        items=[
+            InvoiceItemCreate(
+                description="Work",
+                quantity=Decimal("1"),
+                unit_price=Decimal("100"),
+                discount=Decimal("10"),
+            )
+        ],
+    )
+
+    invoice = InvoiceService().create_draft(db, payload)
+
+    assert invoice.tax_rule_id == rule.id
+    assert invoice.subtotal == Decimal("100.00")
+    assert invoice.discount_total == Decimal("10.00")
+    assert invoice.tax_total == Decimal("16.20")
+    assert invoice.grand_total == Decimal("106.20")
+    assert db.query(InvoiceItem).filter_by(invoice_id=invoice.id).one().tax_rule_id is None
+
+
+def test_invoice_rejects_combining_global_and_line_level_vat():
+    with pytest.raises(ValidationError, match="not both"):
+        InvoiceCreate(
+            document_id="8c4a4b9e-4e51-46c1-8c4a-9b9f1d45a4c2",
+            tax_rule_id="8c4a4b9e-4e51-46c1-8c4a-9b9f1d45a4c3",
+            items=[
+                InvoiceItemCreate(
+                    description="Work",
+                    quantity=Decimal("1"),
+                    unit_price=Decimal("100"),
+                    tax_rule_id="8c4a4b9e-4e51-46c1-8c4a-9b9f1d45a4c4",
+                )
+            ],
+        )
+
+
+def test_invoice_pdf_shows_global_vat_breakdown(invoice_db, monkeypatch):
+    from app.services import invoice_pdf
+
+    db, _validator_id, document_info = invoice_db
+    rule = db.query(TaxRule).one()
+    payload = InvoiceCreate(
+        document_id=document_info[0][0],
+        client_id=document_info[0][1],
+        issue_date=date(2026, 11, 25),
+        currency="XOF",
+        tax_rule_id=rule.public_id,
+        items=[
+            InvoiceItemCreate(
+                description="Work",
+                quantity=Decimal("1"),
+                unit_price=Decimal("100"),
+                discount=Decimal("10"),
+            )
+        ],
+    )
+    invoice = InvoiceService().create_draft(db, payload)
+    rendered_html = {}
+
+    def fake_chromium(command, **_kwargs):
+        html_path = Path(unquote(urlparse(command[-1]).path))
+        rendered_html["content"] = html_path.read_text(encoding="utf-8")
+        pdf_path = Path(command[command.index(next(
+            argument for argument in command if argument.startswith("--print-to-pdf=")
+        ))].split("=", 1)[1])
+        pdf_path.write_bytes(b"%PDF-1.7\nfake")
+        return SimpleNamespace(returncode=0, stderr="")
+
+    monkeypatch.setattr(invoice_pdf.shutil, "which", lambda _name: "/usr/bin/chromium")
+    monkeypatch.setattr(invoice_pdf.subprocess, "run", fake_chromium)
+
+    assert invoice_pdf.render_invoice_pdf(db, invoice).startswith(b"%PDF-")
+    assert "Base soumise à TVA 18% (18 %)" in rendered_html["content"]
+    assert "90 FCFA (XOF)" in rendered_html["content"]
 
 
 def test_invoice_is_not_issued_if_required_r2_storage_fails(invoice_db, monkeypatch):

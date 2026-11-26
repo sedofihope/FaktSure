@@ -77,7 +77,7 @@ TAGS_METADATA = [
     },
     {
         "name": "references",
-        "description": "Règles de taxe, historique de prix et import CSV/XLSX.",
+        "description": "Règles de TVA, historique de prix et import CSV/XLSX des référentiels (réservés à l'administrateur en écriture).",
     },
     {
         "name": "invoices",
@@ -249,7 +249,8 @@ OPERATIONS = {
         "Créer un client",
         "Crée une fiche client. Le RCCM, l'IFU et les coordonnées sont facultatifs. "
         "L'UUID public retourné sert aux références dans les autres routes. "
-        "Rôles admis : `ADMIN`, `ACCOUNTANT`.",
+        "Réservé au rôle `ADMIN`; les comptables peuvent consulter les fiches mais pas "
+        "modifier les référentiels.",
         (401, 403, 422),
     ),
     ("get", "/api/clients/{client_id}"): (
@@ -262,7 +263,7 @@ OPERATIONS = {
         "Modifier un client",
         "Met à jour uniquement les propriétés présentes dans le corps; omettre un champ "
         "le conserve inchangé. Pour effacer une valeur facultative, envoyer `null`. "
-        "Rôles admis : `ADMIN`, `ACCOUNTANT`.",
+        "Réservé au rôle `ADMIN`.",
         (401, 403, 404, 422),
     ),
     ("delete", "/api/clients/{client_id}"): (
@@ -282,7 +283,7 @@ OPERATIONS = {
         "Créer un produit",
         "Ajoute un produit ou service au catalogue. Le SKU est facultatif mais, s'il est "
         "fourni, il doit être unique. Un doublon renvoie `409`. "
-        "Rôles admis : `ADMIN`, `ACCOUNTANT`.",
+        "Réservé au rôle `ADMIN`.",
         (401, 403, 409, 422),
     ),
     ("get", "/api/products/{product_id}"): (
@@ -295,7 +296,7 @@ OPERATIONS = {
         "Modifier un produit",
         "Met à jour uniquement les champs envoyés; les autres restent inchangés. "
         "Envoyer `null` pour effacer une valeur facultative. Un SKU déjà utilisé "
-        "par un autre produit renvoie `409`. Rôles admis : `ADMIN`, `ACCOUNTANT`.",
+        "par un autre produit renvoie `409`. Réservé au rôle `ADMIN`.",
         (401, 403, 404, 409, 422),
     ),
     ("delete", "/api/products/{product_id}"): (
@@ -305,18 +306,19 @@ OPERATIONS = {
         (401, 403, 404),
     ),
     ("get", "/api/tax-rules"): (
-        "Lister les règles de taxe",
-        "Retourne les règles fiscales configurées, leur taux, leur période de validité "
-        "et leur état. La date de facture doit être couverte par la période pour "
-        "qu'une règle soit applicable. Rôles admis : tous les rôles métier.",
+        "Lister les règles de TVA",
+        "Retourne les règles de TVA configurées, leur taux, leur période de validité "
+        "et leur état. Dans le parcours actuel, chaque ligne de facture référence au "
+        "plus une règle de TVA; la date de facture doit être couverte par sa période "
+        "de validité. Tous les rôles métier peuvent consulter les règles.",
         (401, 403),
     ),
     ("post", "/api/tax-rules"): (
-        "Créer une règle de taxe",
+        "Créer une règle de TVA",
         "Crée une règle avec un taux compris entre 0 et 100 et des dates de validité "
         "cohérentes. `valid_until` peut être omis pour une validité sans date de fin. "
-        "La nature et le mode de calcul doivent correspondre à la configuration métier. "
-        "Rôles admis : `ADMIN`, `ACCOUNTANT`.",
+        "Les montants de TVA sont calculés sur la base de chaque ligne après remise. "
+        "Réservé au rôle `ADMIN`.",
         (401, 403, 422),
     ),
     ("get", "/api/products/{product_id}/prices"): (
@@ -330,19 +332,19 @@ OPERATIONS = {
         "Ajouter un prix daté",
         "Ajoute un tarif historique au produit; le prix ne modifie pas les factures "
         "existantes. La devise par défaut est `XOF`; `valid_until` doit être égale "
-        "ou postérieure à `valid_from`. Rôles admis : `ADMIN`, `ACCOUNTANT`.",
+        "ou postérieure à `valid_from`. Réservé au rôle `ADMIN`.",
         (401, 403, 404, 422),
     ),
     ("post", "/api/references/import"): (
         "Importer des référentiels CSV ou XLSX",
-        "Importe des clients, produits ou règles fiscales depuis un fichier `.csv` "
+        "Importe des clients, produits ou règles de TVA depuis un fichier `.csv` "
         "UTF-8 ou `.xlsx`. Le nom de fichier détermine le format; une colonne `name` "
         "est obligatoire. La colonne `type` (ou `kind`) vaut `client`, `product` "
         "(défaut) ou `tax`. Colonnes clients : `name`, `tax_identifier`, `rccm`, "
         "`address`, `phone`, `email`. Produits : `name`, `sku`, `description`, `unit`. "
-        "Taxes : `name`, `rate`, `valid_from`, `valid_until`, `calculation_type`. "
+        "TVA (`type=tax`) : `name`, `rate`, `valid_from`, `valid_until`, `calculation_type`. "
         "Les erreurs sont rapportées par ligne dans `errors`; les lignes valides sont "
-        "importées. Rôles admis : `ADMIN`, `ACCOUNTANT`.",
+        "importées. Réservé au rôle `ADMIN`.",
         (401, 403, 413, 415, 422),
     ),
     ("post", "/api/invoices"): (
@@ -351,10 +353,13 @@ OPERATIONS = {
         "Le corps minimal est `{document_id}`. Sans `items`, le backend reprend les "
         "lignes et montants corrigés après revue; il associe un client actif par IFU/RCCM "
         "ou nom exact, sinon fournir `client_id`. `issue_date` vaut aujourd'hui par "
-        "défaut; `due_date` reste vide si absente. La taxe extraite doit correspondre "
-        "sans ambiguïté à une règle active pour cette date, sinon fournir les lignes "
-        "avec leur `tax_rule_id`. Avec `items`, les lignes sont remplacées et tous les "
-        "montants sont recalculés. La relation vérifiée est "
+        "défaut; `due_date` reste vide si absente. La TVA extraite doit correspondre "
+        "sans ambiguïté à une règle active pour cette date. Pour appliquer une règle à "
+        "toute la facture, fournir le `tax_rule_id` au niveau supérieur : la TVA porte "
+        "alors sur `subtotal - discount_total`. Sinon, définir les `tax_rule_id` sur "
+        "les lignes pour gérer des taux différents. Les deux modes ne peuvent pas être "
+        "mélangés dans une même facture. Avec `items`, les lignes sont remplacées et "
+        "tous les montants sont recalculés. La relation vérifiée est "
         "`grand_total = subtotal - discount_total + tax_total`. "
         "Rôles admis : `ADMIN`, `ACCOUNTANT`.",
         (401, 403, 404, 409, 422),
@@ -402,7 +407,7 @@ OPERATIONS = {
         "Consulter le journal d'audit",
         "Retourne les 500 événements les plus récents : auteur, action, ressource, "
         "valeur précédente et nouvelle valeur. Les mots de passe et secrets ne sont "
-        "pas journalisés. Rôles admis : `ADMIN`, `VALIDATOR`.",
+        "pas journalisés. Réservé au rôle `ADMIN`.",
         (401, 403),
     ),
     ("get", "/api/users"): (
@@ -464,6 +469,16 @@ OPERATIONS = {
         "doivent être configurées dans l'environnement avant l'appel. "
         "Réservé au rôle `ADMIN`.",
         (401, 403, 409, 422),
+    ),
+    ("put", "/api/settings/issuer"): (
+        "Modifier les coordonnées de l'émetteur",
+        "Met à jour partiellement le nom légal, l'adresse, l'identifiant fiscal, "
+        "le RCCM, les coordonnées et les modalités de paiement utilisés dans les factures. "
+        "Les champs absents restent inchangés; une valeur `null` ou vide efface le champ. "
+        "Les modifications sont persistées en base et inscrites au journal d'audit. "
+        "Les clés API et autres secrets ne sont pas modifiables par cette route. "
+        "Réservé au rôle `ADMIN`.",
+        (401, 403, 422),
     ),
 }
 

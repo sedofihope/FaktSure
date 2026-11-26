@@ -10,7 +10,7 @@ def test_every_api_operation_has_french_swagger_documentation():
         if method in {"get", "post", "put", "patch", "delete"}
     ]
 
-    assert len(operations) == 47
+    assert len(operations) == 48
     assert all(operation.get("summary") for operation in operations)
     assert all(len(operation.get("description", "")) >= 100 for operation in operations)
     assert all(operation.get("responses") for operation in operations)
@@ -22,6 +22,9 @@ def test_every_api_operation_has_french_swagger_documentation():
         "invoices",
         "settings",
     }
+    issuer_settings = schema["paths"]["/api/settings/issuer"]["put"]
+    assert issuer_settings["summary"] == "Modifier les coordonnées de l'émetteur"
+    assert "persistées en base" in issuer_settings["description"]
 
 
 def test_swagger_documents_upload_fields_and_binary_responses():

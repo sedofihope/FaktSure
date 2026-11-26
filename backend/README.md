@@ -56,18 +56,17 @@ Configurer les variables d'environnement depuis le gestionnaire de secrets de l'
 - `CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium`
 
 Renseigner également la configuration LLM et `ISSUER_*` selon les fonctionnalités activées. Ne pas copier le fichier `.env` local dans l'image ni utiliser les identifiants locaux de Compose. Le port `PORT` fourni par la plateforme est pris en charge ; à défaut, le conteneur écoute sur `8000`.
+Pour autoriser le frontend hébergé sur un autre domaine, définir `CORS_ALLOWED_ORIGINS` avec les origines exactes séparées par des virgules (par exemple `https://app.example.com`). Le réglage est fermé par défaut; ne pas inclure de chemin ni de barre oblique finale. L'authentification utilise un jeton Bearer, pas des cookies.
 
 Les migrations sont exécutées au démarrage du conteneur : commencer avec une seule instance API. Le disque local de la plateforme peut être éphémère ; R2 est nécessaire pour les fichiers métier persistants. Cette image ne réalise pas la migration des données SQLite vers PostgreSQL. Sauvegarder et migrer les données séparément après avoir choisi l'hébergeur et le fournisseur PostgreSQL.
 
-### Essai gratuit Render + Neon
+### Démo temporaire sur Railway avec SQLite
 
-Le Blueprint [`render.yaml`](../render.yaml) configure l'API sur Render Free avec l'image Docker, Chromium et le health check. Créer d'abord une base PostgreSQL Neon Free, puis créer le service Render depuis le Blueprint et fournir `DATABASE_URL` lorsque Render le demande. Utiliser une URL PostgreSQL Neon avec le dialecte SQLAlchemy `postgresql+psycopg://` et TLS (`sslmode=require`); garder cette URL dans les variables secrètes Render, jamais dans Git ou le chat. Le Blueprint génère `JWT_SECRET` automatiquement.
+Pour la démo, Railway exécute l'image Docker ci-dessus avec SQLite sur un volume persistant. Monter un volume sur `/data` et configurer `APP_ENV=production`, `DATABASE_URL=sqlite:////data/faktsure.db`, `STORAGE_ROOT=/data/documents`, `JWT_SECRET` (unique, aléatoire et d'au moins 32 caractères) et `MAX_DOCUMENT_CONCURRENCY=1`. Le Dockerfile définit déjà `CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium`. Définir `RAILWAY_DOCKERFILE_PATH=backend/Dockerfile` et garder la racine du dépôt comme contexte de build.
 
-Render Free fournit 512 Mo de RAM, met le service en veille après 15 minutes sans trafic et possède un système de fichiers éphémère. Le premier appel après la veille peut attendre environ une minute. `R2_ENABLED=false` est volontaire pour le test initial : les documents stockés localement pourront disparaître lors d'un redémarrage, d'une veille ou d'un redéploiement. Configurer R2 avant d'y conserver des documents ou PDF importants. Ne pas utiliser cette offre gratuite en production.
+Le volume Railway est monté avec des permissions root ; l'image utilise par défaut un utilisateur non-root. Pour cette démo seulement, `RAILWAY_RUN_UID=0` permet au conteneur d'écrire sur le volume, au prix d'une isolation réduite. Garder une seule instance : les tâches de traitement sont en mémoire et SQLite n'est pas configuré pour plusieurs instances. Le plan Railway Free limite chaque service à 512 Mo de RAM et le volume à 0,5 Go. Vérifier la consommation avant une démo réelle et ne pas traiter des données importantes sans sauvegardes.
 
-La limite mémoire a été vérifiée localement avec l'image Docker : l'API et un rendu PDF Chromium simple ont coexisté sous 512 Mo (pic mesuré d'environ 379 Mo). Le flux complet de génération de facture sur Render Free reste à vérifier; sa marge mémoire est limitée. CORS n'est pas encore configuré : l'origine exacte du frontend devra être ajoutée à l'application avant qu'un navigateur hébergé sur un autre domaine puisse appeler l'API.
-
-Ne pas choisir le Postgres gratuit Render pour conserver les données du prototype : il est supprimé après 30 jours. Neon Free n'a pas cette expiration, mais suspend son calcul après cinq minutes d'inactivité et offre 1 Go de stockage par projet.
+Le fichier SQLite et les documents conservés sous `/data` persistent sur le volume. Les pièces PDF de facture émises doivent néanmoins être stockées dans R2 : activer `R2_ENABLED=true` et configurer les identifiants R2 dans les variables Railway. Les variables sensibles restent dans le gestionnaire de variables Railway ; ne pas copier un `.env` local complet ni le committer.
 
 ## LLM
 
@@ -83,7 +82,7 @@ Les PDF de factures sont des pièces métier persistantes : ils sont écrits dan
 
 ## Configuration administrateur
 
-Les administrateurs disposent de `GET /api/settings` et des mises à jour `PUT /api/settings/processing`, `/ai` et `/storage`. Les secrets restent dans l'environnement et ne sont jamais retournés par l'API. Les informations légales de l'émetteur peuvent être configurées avec les variables `ISSUER_*`.
+Les administrateurs disposent de `GET /api/settings` et des mises à jour `PUT /api/settings/processing`, `/ai`, `/storage` et `/issuer`. Les secrets restent dans l'environnement et ne sont jamais retournés par l'API. Les informations légales de l'émetteur sont initialisées par les variables `ISSUER_*`, puis peuvent être modifiées dans l'interface d'administration; ces valeurs sont persistées en base et auditées.
 
 ## Règles financières
 

@@ -3,10 +3,11 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
 from app.api.documentation import API_DESCRIPTION, ERROR_RESPONSE, OPERATIONS, TAGS_METADATA
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.exceptions import register_exception_handlers
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
@@ -15,6 +16,19 @@ import app.models  # noqa: F401 - register SQLAlchemy models
 
 
 logger = logging.getLogger(__name__)
+
+
+def configure_cors(app: FastAPI, settings: Settings) -> None:
+    """Allow browser requests only from explicitly configured frontend origins."""
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.parsed_cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+        expose_headers=["Content-Disposition", "Content-Length"],
+    )
 
 
 def _log_recovery_result(task: asyncio.Task) -> None:
@@ -59,6 +73,7 @@ app = FastAPI(
     openapi_tags=TAGS_METADATA,
     lifespan=lifespan,
 )
+configure_cors(app, settings)
 register_exception_handlers(app)
 from app.api.v1.router import router
 app.include_router(router)

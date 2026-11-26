@@ -18,7 +18,7 @@ def list_clients(db: Session = Depends(get_db), _user: User = Depends(require_ro
     return list(db.scalars(select(Client).order_by(Client.id)))
 
 @router.post("", response_model=ClientResponse, status_code=201)
-def create_client(payload: ClientCreate, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT"))):
+def create_client(payload: ClientCreate, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN"))):
     client = Client(**payload.model_dump())
     db.add(client); db.commit(); db.refresh(client)
     return client
@@ -31,7 +31,7 @@ def get_client(client_id: UUID, db: Session = Depends(get_db), _user: User = Dep
     return client
 
 @router.put("/{client_id}", response_model=ClientResponse)
-def update_client(client_id: UUID, payload: ClientUpdate, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN", "ACCOUNTANT"))):
+def update_client(client_id: UUID, payload: ClientUpdate, db: Session = Depends(get_db), _user: User = Depends(require_roles("ADMIN"))):
     client = db.scalar(select(Client).where(Client.public_id == client_id))
     if client is None:
         raise NotFoundError("Client not found")

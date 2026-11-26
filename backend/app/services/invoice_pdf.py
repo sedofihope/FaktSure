@@ -11,7 +11,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
+from app.core.runtime_settings import get_runtime_settings
 from app.models.client import Client
 from app.models.extracted_field import ExtractedField
 from app.models.invoice import Invoice
@@ -20,7 +20,7 @@ from app.models.tax_rule import TaxRule
 from app.services.calculation_service import money
 from app.utils.number_formatting import format_decimal
 
-PDF_FORMAT_VERSION = 7
+PDF_FORMAT_VERSION = 8
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
 _TEMPLATE_DIR = _BACKEND_ROOT / "app" / "templates" / "invoices"
 _ASSET_DIR = _BACKEND_ROOT / "app" / "static" / "invoice"
@@ -87,7 +87,7 @@ def render_invoice_pdf(db: Session, invoice: Invoice) -> bytes:
         .order_by(InvoiceItem.id)
     ).all()
     client = db.get(Client, invoice.client_id) if invoice.client_id else None
-    settings = get_settings()
+    settings = get_runtime_settings()
     extracted_fields = db.scalars(
         select(ExtractedField).where(
             ExtractedField.document_id == invoice.document_id
@@ -103,6 +103,8 @@ def render_invoice_pdf(db: Session, invoice: Invoice) -> bytes:
     }
 
     tax_rule_ids = {item.tax_rule_id for item in items if item.tax_rule_id is not None}
+    if invoice.tax_rule_id is not None:
+        tax_rule_ids.add(invoice.tax_rule_id)
     tax_rules = {
         rule.id: rule
         for rule in db.scalars(
@@ -112,15 +114,22 @@ def render_invoice_pdf(db: Session, invoice: Invoice) -> bytes:
 
     rendered_items: list[dict[str, str | None]] = []
     tax_totals: dict[tuple[str, Decimal], dict[str, Decimal]] = {}
+    if invoice.tax_rule_id is not None:
+        invoice_tax_rule = tax_rules.get(invoice.tax_rule_id)
+        if invoice_tax_rule is not None:
+            tax_totals[(invoice_tax_rule.name, invoice_tax_rule.rate)] = {
+                "base": money(invoice.subtotal - invoice.discount_total),
+                "amount": invoice.tax_total,
+            }
     for item in items:
         rule = tax_rules.get(item.tax_rule_id)
         gross = money(item.quantity * item.unit_price)
         tax_amount = (
             money(item.line_total * rule.rate / Decimal("100"))
-            if rule is not None
+            if rule is not None and invoice.tax_rule_id is None
             else Decimal("0.00")
         )
-        if rule is not None:
+        if rule is not None and invoice.tax_rule_id is None:
             tax_key = (rule.name, rule.rate)
             totals = tax_totals.setdefault(
                 tax_key,

@@ -709,13 +709,17 @@ Pour une ligne :
 
 Montant brut = Quantité × Prix unitaire.
 
-Montant net = Montant brut - Remise.
+Montant net taxable = Montant brut - Remise.
 
 Montant de taxe = Base taxable × Taux applicable.
 
-Total TTC = Total HT + Total des taxes.
+Total TTC = Sous-total - Remises + Total des taxes.
 
-Les règles exactes doivent tenir compte de la nature des taxes et de leur mode d'application.
+Le contrôle de cohérence d'un document applique la même règle : `grand_total = subtotal - discount_total + tax_total`. La remise est déduite avant le calcul des taxes lorsque celles-ci portent sur la base taxable remisée.
+
+Pour le parcours actuel, la taxe de référence est la TVA. Une facture peut utiliser soit une règle de TVA rattachée à chaque ligne, soit une règle unique appliquée au total net de la facture. Dans les deux cas, la TVA est calculée après remise. Une remise globale extraite est répartie entre les lignes avant le calcul lorsque le mode par ligne est utilisé. Le mode par ligne permet d'appliquer des taux différents lorsque les lignes sont soumises à des traitements différents.
+
+Les deux modes ne doivent pas être cumulés sur une même facture. Le mode global ne convient que si la facture a une base taxable et un taux uniques; en présence de plusieurs taux ou de lignes exonérées, il faut utiliser le mode par ligne pour éviter un calcul erroné. Les taux et périodes applicables doivent être configurés et confirmés par l'administrateur.
 
 Les calculs financiers doivent utiliser `Decimal` afin d'éviter les erreurs de précision des nombres flottants.
 
@@ -991,6 +995,7 @@ Attributs :
 - `id`
 - `name`
 - `tax_identifier`
+- `rccm`
 - `address`
 - `phone`
 - `email`

@@ -49,6 +49,22 @@ class InvoiceService:
         issue_date = payload.issue_date or date.today()
         due_date = payload.due_date
         currency = self._currency(payload.currency or extracted.get("currency"))
+        invoice_tax_rule = None
+        if payload.tax_rule_id:
+            invoice_tax_rule = db.scalar(
+                select(TaxRule).where(TaxRule.public_id == payload.tax_rule_id)
+            )
+            if invoice_tax_rule is None:
+                raise ValueError("Tax rule not found")
+            if not invoice_tax_rule.is_active or not (
+                invoice_tax_rule.valid_from <= issue_date
+                and (invoice_tax_rule.valid_until is None or issue_date <= invoice_tax_rule.valid_until)
+            ):
+                raise ValueError("Tax rule is not active on the invoice date")
+            if invoice_tax_rule.calculation_type != "PERCENTAGE":
+                raise ValueError(
+                    f"Unsupported tax calculation type: {invoice_tax_rule.calculation_type}"
+                )
 
         extracted_grand_total = None
         if payload.items is None:
@@ -63,7 +79,7 @@ class InvoiceService:
                 ).order_by(TaxRule.id)
             ).all()
             matching_rules = []
-            if extracted_tax_total:
+            if extracted_tax_total and not invoice_tax_rule:
                 for candidate in applicable_rules:
                     if candidate.calculation_type != "PERCENTAGE":
                         continue
@@ -95,6 +111,7 @@ class InvoiceService:
         invoice = Invoice(
             document_id=document.id,
             client_id=client.id,
+            tax_rule_id=invoice_tax_rule.id if invoice_tax_rule else None,
             invoice_number=f"DRAFT-{document.id}",
             issue_date=issue_date,
             due_date=due_date,
@@ -157,6 +174,12 @@ class InvoiceService:
                 subtotal += gross
                 discount_total += discount
                 tax_total += tax
+            if invoice_tax_rule:
+                tax_total = money(
+                    (subtotal - discount_total)
+                    * invoice_tax_rule.rate
+                    / Decimal("100")
+                )
             invoice.subtotal = money(subtotal)
             invoice.discount_total = money(discount_total)
             invoice.tax_total = money(tax_total)

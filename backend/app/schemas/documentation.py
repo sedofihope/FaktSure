@@ -136,3 +136,4 @@ class SettingsUpdateResponse(BaseModel):
     provider: str | None = None
     model: str | None = None
     backend: str | None = None
+    issuer: IssuerSettingsResponse | None = None

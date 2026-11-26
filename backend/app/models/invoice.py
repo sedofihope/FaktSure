@@ -11,6 +11,10 @@ class Invoice(PublicIdMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), nullable=True)
+    tax_rule_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tax_rules.id", name="fk_invoices_tax_rule_id_tax_rules"),
+        nullable=True,
+    )
     invoice_number: Mapped[str] = mapped_column(String(100), unique=True)
     issue_date: Mapped[date]
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -34,6 +38,7 @@ class Invoice(PublicIdMixin, Base):
 
     document: Mapped["Document"] = relationship()
     client: Mapped["Client | None"] = relationship()
+    tax_rule: Mapped["TaxRule | None"] = relationship()
 
     @property
     def document_public_id(self):
@@ -42,3 +47,7 @@ class Invoice(PublicIdMixin, Base):
     @property
     def client_public_id(self):
         return self.client.public_id if self.client else None
+
+    @property
+    def tax_rule_public_id(self):
+        return self.tax_rule.public_id if self.tax_rule else None
