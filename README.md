@@ -1,5 +1,7 @@
 # FaktSure
 
+URL de démonstration : https://faktsure.vercel.app/
+
 FaktSure est un backend d'automatisation de la facturation. Il transforme des documents commerciaux en données structurées, détecte les incohérences, organise la revue humaine, puis prépare et émet des factures PDF.
 
 > **Principe de contrôle :** le LLM extrait les informations ; le backend applique les règles métier et recalcule les montants ; un utilisateur autorisé vérifie et décide avant l'émission. FaktSure ne transmet pas les factures à une administration fiscale et n'effectue aucun paiement.
