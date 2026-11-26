@@ -1,6 +1,8 @@
 # FaktSure
 
-URL de démonstration : https://faktsure.vercel.app/
+URL de démonstration : https://faktsure.vercel.app/  
+Adresse email : admin@test.com  
+Password : password1234
 
 FaktSure est un backend d'automatisation de la facturation. Il transforme des documents commerciaux en données structurées, détecte les incohérences, organise la revue humaine, puis prépare et émet des factures PDF.
 
