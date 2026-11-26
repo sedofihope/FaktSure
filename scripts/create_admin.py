@@ -2,7 +2,16 @@ import getpass
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+project_root = Path(__file__).resolve().parents[1]
+backend_root = project_root / "backend"
+if (backend_root / "app").is_dir():
+    import_root = backend_root
+elif (project_root / "app").is_dir():
+    import_root = project_root
+else:
+    raise RuntimeError("Could not locate the backend application package")
+
+sys.path.insert(0, str(import_root))
 
 from sqlalchemy import select
 
